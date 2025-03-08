@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
+const auth = require('../middleware/auth'); // Import auth middleware
 const router = express.Router();
 
 // Register a new user
@@ -47,7 +48,7 @@ router.post('/login', async (req, res) => {
         jwt.sign(
             payload,
             process.env.JWT_SECRET,
-            { expiresIn: 3600 },
+            { expiresIn: '1h' },
             (err, token) => {
                 if (err) throw err;
                 res.json({ token });
@@ -59,11 +60,22 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// Get all users (new route)
-router.get('/', async (req, res) => {
+// Get all users (protected route)
+router.get('/', auth, async (req, res) => {
     try {
-        const users = await User.find();
+        const users = await User.find().select('-password'); // Exclude password field
         res.json(users);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
+});
+
+// Get logged-in user's details (protected route)
+router.get('/me', auth, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id).select('-password');
+        res.json(user);
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server error');
