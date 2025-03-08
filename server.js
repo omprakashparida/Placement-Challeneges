@@ -1,51 +1,55 @@
-require('dotenv').config({ path: './main.env' }); // Load environment variables
+require('dotenv').config({ path: './main.env' }); // Load environment variables from main.env
 const express = require('express');
 const mongoose = require('mongoose');
-const bodyParser = require('body-parser');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
 
 const app = express();
-app.set('trust proxy', 1); // Enable trust for reverse proxies
 
+// Middleware
+app.use(express.json());
+app.use(cors({
+  origin: '*', // For production, restrict to your frontend domain
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'x-auth-token']
+}));
+app.use(helmet());
+app.use(mongoSanitize());
 
-// ✅ Security Middleware
-app.use(bodyParser.json({ limit: '10mb' })); // Prevent large payload attacks
-app.use(cors({ origin: '*', credentials: true })); // Allow cross-origin requests
-app.use(helmet()); // Secure HTTP headers
-app.use(mongoSanitize()); // Prevent NoSQL Injection
-
-// 🚀 Rate Limiting
+// Rate limiting
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per window
-    standardHeaders: true,
-    legacyHeaders: false
+    max: 100 // Limit each IP to 100 requests per windowMs
 });
 app.use(limiter);
 
-// ✅ MongoDB Connection
-mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log('✅ Connected to MongoDB'))
-    .catch(err => {
-        console.error('❌ MongoDB Connection Error:', err.message);
-        process.exit(1); // Exit process if connection fails
-    });
+// Connect to MongoDB
+mongoose.connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+})
+.then(() => console.log('✅ Connected to MongoDB'))
+.catch((err) => {
+    console.error('❌ MongoDB Connection Error:', err.message);
+    process.exit(1);
+});
 
 const db = mongoose.connection;
 db.on('error', err => console.error('❌ Database error:', err.message));
 
-// ✅ Routes
+// Mount routes
 const usersRouter = require('./backend/routes/users');
 app.use('/api/users', usersRouter);
 
-// 🌍 Root Route
+// Test route
 app.get('/', (req, res) => {
-    res.status(200).json({ success: true, message: 'PlacementPulse Backend is Running 🚀' });
+    res.send('PlacementPulse Backend');
 });
 
-// 🚀 Start Server
+// Start server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`✅ Server is running on port ${PORT}`));
+app.listen(PORT, () => {
+    console.log(`🚀 Server is running on port ${PORT}`);
+});
